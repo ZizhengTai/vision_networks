@@ -193,7 +193,7 @@ class DenseNet:
             # ReLU
             output = tf.nn.relu(output)
             # convolution
-            output = self.conv2d(
+            output = self.conv2d_low_rank(
                 output, out_features=out_features, kernel_size=kernel_size)
             # dropout(in case of training and in case it is no 1.0)
             output = self.dropout(output)
@@ -279,6 +279,30 @@ class DenseNet:
             [kernel_size, kernel_size, in_features, out_features],
             name='kernel')
         output = tf.nn.conv2d(_input, kernel, strides, padding)
+        return output
+
+    def conv2d_low_rank(self, _input, out_features, kernel_size,
+                        strides=[1, 1, 1, 1]):
+        in_features = int(_input.get_shape()[-1])
+
+        # (0, 1) padding
+        output = tf.pad(_input, [[0, 0], [0, 0], [1, 1], [0, 0]], 'CONSTANT')
+
+        # 1 x K kernel
+        kernel_1xK = self.weight_variable_msra(
+            [1, kernel_size, in_features, out_features],
+            name='kernel_1xK')
+        output = tf.nn.conv2d(output, kernel_1xK, strides, 'VALID')
+
+        # (1, 0) padding
+        output = tf.pad(output, [[0, 0], [1, 1], [0, 0], [0, 0]], 'CONSTANT')
+
+        # K x 1 kernel
+        kernel_Kx1 = self.weight_variable_msra(
+            [kernel_size, 1, out_features, out_features],
+            name='kernel_Kx1')
+        output = tf.nn.conv2d(output, kernel_Kx1, strides, 'VALID')
+
         return output
 
     def avg_pool(self, _input, k):
