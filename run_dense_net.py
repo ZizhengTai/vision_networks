@@ -103,6 +103,11 @@ if __name__ == '__main__':
         help='Do not erase previous logs for model if exists.')
     parser.set_defaults(renew_logs=True)
 
+    parser.add_argument(
+        '--pred-results', dest='pred_results', type=str,
+        default='logs/pred-results.csv',
+        help='Files to store prediction results')
+
     args = parser.parse_args()
 
     if not args.keep_prob:
@@ -143,5 +148,11 @@ if __name__ == '__main__':
             model.load_model()
         print("Data provider test images: ", data_provider.test.num_examples)
         print("Testing...")
-        loss, accuracy = model.test(data_provider.test, batch_size=200)
+        loss, accuracy, correct_predictions = model.test(
+            data_provider.test, batch_size=200)
         print("mean cross_entropy: %f, mean accuracy: %f" % (loss, accuracy))
+
+        with open(args.pred_results, 'w') as f:
+            f.write('index,correct\n')
+            for i, is_correct in enumerate(correct_predictions):
+                f.write('{0},{1}\n'.format(i, is_correct))

@@ -143,7 +143,8 @@ class DenseNet:
 
     def load_model(self):
         try:
-            self.saver.restore(self.sess, self.save_path + 'something')
+            self.saver = tf.train.import_meta_graph(self.save_path + '.meta')
+            self.saver.restore(self.sess, self.save_path)
         except Exception as e:
             raise IOError("Failed to to load model "
                           "from save path: %s" % self.save_path)
@@ -381,10 +382,11 @@ class DenseNet:
         self.train_step = optimizer.minimize(
             cross_entropy + l2_loss * self.weight_decay)
 
-        correct_prediction = tf.equal(
+        correct_predictions = tf.equal(
             tf.argmax(prediction, 1),
             tf.argmax(self.labels, 1))
-        self.accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
+        self.correct_predictions = correct_predictions
+        self.accuracy = tf.reduce_mean(tf.cast(correct_predictions, tf.float32))
 
     def train_all_epochs(self, train_params):
         n_epochs = train_params['n_epochs']
@@ -457,6 +459,7 @@ class DenseNet:
         num_examples = data.num_examples
         total_loss = []
         total_accuracy = []
+        all_correct_predictions = []
         for i in range(num_examples // batch_size):
             batch = data.next_batch(batch_size)
             feed_dict = {
@@ -464,10 +467,14 @@ class DenseNet:
                 self.labels: batch[1],
                 self.is_training: False,
             }
-            fetches = [self.cross_entropy, self.accuracy]
-            loss, accuracy = self.sess.run(fetches, feed_dict=feed_dict)
+            fetches = [self.cross_entropy,
+                       self.accuracy,
+                       self.correct_predictions]
+            loss, accuracy, correct_predictions = self.sess.run(
+                fetches, feed_dict=feed_dict)
             total_loss.append(loss)
             total_accuracy.append(accuracy)
+            all_correct_predictions.extend(correct_predictions)
         mean_loss = np.mean(total_loss)
         mean_accuracy = np.mean(total_accuracy)
-        return mean_loss, mean_accuracy
+        return mean_loss, mean_accuracy, all_correct_predictions
